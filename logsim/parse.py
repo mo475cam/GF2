@@ -253,9 +253,6 @@ class Parser:
         elif error_type == "NO_MONITOR_DEF":
             print("Error: Incorrect monitor definition")
             self.syntax_error_count += 1
-        elif error_type == "NO_NEWLINE":
-            print("Error: New line expected")
-            self.syntax_error_count += 1
         elif error_type == "DEVICE_EXISTS":
             print("Error: Device name already used")
         elif error_type == "NO_DEVICE":
@@ -266,11 +263,13 @@ class Parser:
             print("Error: Output is already being monitored")
         elif error_type == "MONITOR_FAILED":
             print("Error: Output not being monitored")
+        elif error_type == "CONNECTION_NOT_MADE":
+            print("Error: Connection not made")
 
-        # error_message = self.scanner.errorPosition()
-        # print(error_message[0], "\n", error_message[1])
+        error_message = self.scanner.error_location()
+        print(error_message[0], "\n", error_message[1], "\n", error_message[2])
 
-        print(self.names.get_name_string(self.symbol.id))
+        #print(self.names.get_name_string(self.symbol.id))
 
         stopping_symbols = []
         go_to_next = []
@@ -513,14 +512,15 @@ class Parser:
             self.symbol = self.scanner.get_symbol()
             self.input()
             if self.connection_error is False:
-                error_type = self.network.make_connection(self.input_device_id,
-                                                          self.input_id,
-                                                          self.output_device_id,
-                                                          self.output_id)
-                if error_type != self.network.NO_ERROR:
-                    self.error("NO_CONNECTION", [(self.scanner.EOF, False)])
-                    self.connection_error = True
-                    self.section_skipped = True
+                if self.syntax_error_count == 0:
+                    error_type = self.network.make_connection(self.input_device_id,
+                                                              self.input_id,
+                                                              self.output_device_id,
+                                                              self.output_id)
+                    if error_type != self.network.NO_ERROR:
+                        self.error("CONNECTION_NOT_MADE", [(self.scanner.EOF, False)])
+                        self.connection_error = True
+                        self.section_skipped = True
                 if self.symbol.type == self.scanner.PUNCTUATION \
                         and self.symbol.id == self.scanner.COMMA:
                     self.symbol = self.scanner.get_symbol()
@@ -1302,11 +1302,29 @@ class Parser:
                 if self.symbol.type == self.scanner.PUNCTUATION \
                         and self.symbol.id == self.scanner.HASHTAG:
                     self.symbol = self.scanner.get_symbol()
-                elif self.symbol.type == self.scanner.EOF:
-                    sys.exit()
+                    if self.symbol.type == self.scanner.EOF:
+                        if self.devices_instance == 0 or \
+                            self.connections_instance == 0 or \
+                                self.monitoring_instance == 0:
+                            self.device_error = True
+                            self.connection_error = True
+                            self.monitor_error = True
+                            self.section_skipped = False
                 else:
-                    self.error("NO_NEWLINE", [(self.scanner.EOF, False)])
+                    self.error("NO_HASHTAG", [(self.scanner.EOF, False)])
+                    self.device_error = True
+                    self.connection_error = True
+                    self.monitor_error = True
+                    self.section_skipped = True
             else:
                 self.error("NO_CHARACTER_DIGIT", [(self.scanner.HASHTAG, True)])
+                self.device_error = True
+                self.connection_error = True
+                self.monitor_error = True
+                self.section_skipped = True
         else:
             self.error("NO_HASHTAG", [(self.scanner.HASHTAG, True)])
+            self.device_error = True
+            self.connection_error = True
+            self.monitor_error = True
+            self.section_skipped = True
