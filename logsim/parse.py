@@ -374,6 +374,11 @@ class Parser:
         """monitor = "MONITOR", output, {("and"| ",") output}, ";"""""
         self.symbol = self.scanner.get_symbol()
         self.output()
+        if self.error_count == 0:
+            error_type = self.monitors.make_monitor(self.output_device_id, self.output_id)
+            if error_type != self.monitors.NO_ERROR:
+                self.error("MONITOR_FAILED", [(self.scanner.EOF, False)])
+                self.section_skipped = True
         if self.monitor_error is False:
             if self.symbol.type == self.scanner.NAME:
                 self.error("NO_MONITOR_DEF", [(self.scanner.SEMICOLON, True),
