@@ -31,8 +31,8 @@ class Symbol:
 
         self.type = None
         self.id = None
-        # self.line = None
-        # self.position = None
+        self.line = None
+        self.position = None
 
 
 class Scanner:
@@ -70,10 +70,10 @@ class Scanner:
                                  self.NAME, self.INTEGER, self.INT16,
                                  self.EOF, self.SPECIAL] = range(7)
 
-        self.punctuation_list = [";", ":", ".", ",", "#", "\n", ""]
+        self.punctuation_list = [";", ":", ".", ",", "#", ""]
 
         [self.SEMICOLON, self.COLON, self.FULLSTOP,
-         self.COMMA, self.HASHTAG, self.NEWLINE, self.EOF_ID] = \
+         self.COMMA, self.HASHTAG, self.EOF_ID] = \
             self.names.lookup(self.punctuation_list)
 
         self.numbers_list = ['0', '1', '2', '3', '4', '5', '6',
@@ -148,13 +148,9 @@ class Scanner:
         # check for comments
         elif self.current_character == "#":
             symbol.type = self.PUNCTUATION
-            symbol.id = self.names.query(self.current_character)
+            symbol.id = self.HASHTAG
             # print("#")
             self.nextCharacter()
-            while self.current_character != '\n':
-                # print(self.current_character)
-                symbol.type = self.PUNCTUATION
-                self.nextCharacter()
 
         # check for end of line
         elif self.current_character == "":
