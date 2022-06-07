@@ -52,23 +52,13 @@ class Parser:
         self.scanner = scanner
 
         self.symbol = self.scanner.get_symbol()
-
         self.name_string = ""
         self.device_id = 0
         self.output_id = 0
         self.input_id = 0
         self.input_device_id = 0
         self.output_device_id = 0
-
-        self.switch_input = 0
-        self.clock_cycle = 0
-        self.no_inputs = 0
-
         self.devices_symbol_list = []
-        self.device_input_dict = {}
-        self.device_output_dict = {}
-        self.monitored_outputs = []
-
         self.input_added = False
         self.output_added = False
 
@@ -83,7 +73,7 @@ class Parser:
         self.gate_error = False
         self.input_error = False
         self.output_error = False
-        self.section_skipped = False
+        self.id_error = False
 
         self.defining = False
         self.connecting = False
@@ -115,7 +105,6 @@ class Parser:
                 self.defining = True
                 self.device_error = False
                 self.devices_list()
-                self.device_dictionary()
                 self.defining = False
                 self.devices_instance += 1
                 if self.devices_instance > 1:
@@ -149,8 +138,7 @@ class Parser:
 
         if (self.devices_instance != 1 or
                 self.connections_instance != 1 or
-                self.monitoring_instance != 1) and \
-                self.section_skipped is False:
+                self.monitoring_instance != 1) and self.id_error is False:
             print("Error: Not all sections present")
             self.error_count += 1
 
@@ -238,10 +226,6 @@ class Parser:
             print("Error: Device name already used")
         elif error_type == "NO_DEVICE":
             print("Error: Device has not been defined")
-        elif error_type == "INPUT_USED":
-            print("Error: Input has already been connected")
-        elif error_type == "OUTPUT_MONITORED":
-            print("Error: Output is already being monitored")
 
         # error_message = self.scanner.errorPosition()
         # print(error_message[0], "\n", error_message[1])
@@ -351,7 +335,6 @@ class Parser:
                     self.symbol = self.scanner.get_symbol()
                     if self.monitor_error is False:
                         self.output()
-                        error_type = self.monitors.make_monitor(self.output_device_id, self.output_id)
                         if self.symbol.type == self.scanner.EOF:
                             break
                     else:
@@ -390,7 +373,6 @@ class Parser:
                             self.symbol = self.scanner.get_symbol()
                             self.device_error = False
                         else:
-                            self.section_skipped = True
                             self.device_error = True
                 else:
                     if self.name_error:
@@ -399,8 +381,8 @@ class Parser:
                     elif self.gate_error:
                         self.gate_error = False
                         self.device_error = False
-                    elif self.section_skipped:
-                        self.device_error = True
+                    elif self.id_error is False:
+                        self.device_error = False
             else:
                 self.error("NO_IS", [(self.scanner.CONNECTIONS_ID, False),
                                      (self.scanner.MONITOR_ID, False),
@@ -409,7 +391,6 @@ class Parser:
                     self.symbol = self.scanner.get_symbol()
                     self.device_error = False
                 else:
-                    self.section_skipped = True
                     self.device_error = True
         else:
             if self.name_error:
@@ -418,8 +399,8 @@ class Parser:
             elif self.gate_error:
                 self.gate_error = False
                 self.device_error = False
-            elif self.section_skipped:
-                self.device_error = True
+            elif self.id_error is False:
+                self.device_error = False
 
     # @pytest.fixture
     # def test_device(self):
@@ -427,7 +408,7 @@ class Parser:
     #            and (self.symbol.type == self.scanner.NAME
     #                 or self.symbol.type == self.scanner.KEYWORD)
 
-    def name(self):
+    def name(self):  # FIX ERROR HANDLING
         """name = character, {character|digit};"""
         if self.symbol.type == self.scanner.NAME:
             name_id = self.get_id(self.symbol)
@@ -441,9 +422,6 @@ class Parser:
                 if self.symbol.id == self.scanner.COMMA:
                     self.symbol = self.scanner.get_symbol()
                     self.name_error = True
-                elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                        self.symbol.id == self.scanner.MONITOR_ID:
-                    self.section_skipped = True
                 self.device_error = True
             elif self.connecting:
                 self.error("NO_CHARACTER", [(self.scanner.COMMA, False),
@@ -452,9 +430,6 @@ class Parser:
                 if self.symbol.id == self.scanner.COMMA:
                     self.symbol = self.scanner.get_symbol()
                     self.name_error = True
-                elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                        self.symbol.id == self.scanner.MONITOR_ID:
-                    self.section_skipped = True
                 self.connection_error = True
             elif self.monitoring:
                 self.error("NO_CHARACTER", [(self.scanner.SEMICOLON, False),
@@ -472,12 +447,10 @@ class Parser:
             self.symbol = self.scanner.get_symbol()
             self.input()
             if self.connection_error is False:
-                error_type = self.network.make_connection(self.input_device_id,
-                                                          self.input_id,
-                                                          self.output_device_id,
-                                                          self.output_id)
-                # if error_type != self.network.NO_ERROR:
-                #     self.error("NO_CONNECTION", (self.scanner.EOF, False))
+                # error_type = self.network.make_connection(self.output_device_id,
+                #                                           self.output_id,
+                #                                           self.input_device_id,
+                #                                           self.input_id)
                 if self.symbol.type == self.scanner.PUNCTUATION \
                         and self.symbol.id == self.scanner.COMMA:
                     self.symbol = self.scanner.get_symbol()
@@ -491,7 +464,6 @@ class Parser:
                         self.symbol = self.scanner.get_symbol()
                         self.connection_error = False
                     else:
-                        self.section_skipped = True
                         self.connection_error = True
             else:
                 if self.name_error:
@@ -500,8 +472,8 @@ class Parser:
                 elif self.gate_error:
                     self.gate_error = False
                     self.connection_error = False
-                elif self.section_skipped:
-                    self.connection_error = True
+                elif self.id_error is False:
+                    self.connection_error = False
         else:
             if self.name_error:
                 self.name_error = False
@@ -509,8 +481,8 @@ class Parser:
             elif self.gate_error:
                 self.gate_error = False
                 self.device_error = False
-            elif self.section_skipped:
-                self.device_error = True
+            elif self.id_error is False:
+                self.device_error = False
 
     def input(self):
         """input = name, ".", (boolean_input | dtype_input);"""
@@ -535,18 +507,12 @@ class Parser:
                     if self.symbol.id == self.scanner.COMMA:
                         self.symbol = self.scanner.get_symbol()
                         self.input_error = True
-                    elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                            self.symbol.id == self.scanner.MONITOR_ID:
-                        self.section_skipped = True
                     self.connection_error = True
             else:
                 self.error("NO_INPUT_TYPE", [(self.scanner.COMMA, False),
                                              (self.scanner.MONITOR_ID, False)])
                 if self.symbol.id == self.scanner.COMMA:
                     self.input_error = True
-                elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                        self.symbol.id == self.scanner.MONITOR_ID:
-                    self.section_skipped = True
                 self.connection_error = True
 
     # @pytest.fixture
@@ -572,9 +538,6 @@ class Parser:
                         if self.symbol.id == self.scanner.COMMA:
                             self.symbol = self.scanner.get_symbol()
                             self.output_error = True
-                        elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                                self.symbol.id == self.scanner.MONITOR_ID:
-                            self.section_skipped = True
                         self.connection_error = True
                     elif self.monitoring:
                         self.monitor_error = True
@@ -588,9 +551,6 @@ class Parser:
                     if self.symbol.id == self.scanner.COMMA:
                         self.symbol = self.scanner.get_symbol()
                         self.output_error = True
-                    elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                            self.symbol.id == self.scanner.MONITOR_ID:
-                        self.section_skipped = True
                     self.connection_error = True
                 else:
                     self.error("NO_OUTPUT_TYPE", [(self.scanner.COMMA, False),
@@ -598,9 +558,6 @@ class Parser:
                     if self.symbol.id == self.scanner.COMMA:
                         self.symbol = self.scanner.get_symbol()
                         self.output_error = True
-                    elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                            self.symbol.id == self.scanner.MONITOR_ID:
-                        self.section_skipped = True
                     self.connection_error = True
             elif self.symbol.id != self.scanner.AND and \
                     self.symbol.id != self.scanner.COMMA and \
@@ -610,20 +567,9 @@ class Parser:
                 self.error("NO_MONITOR_DEF", [(self.scanner.EOF, False)])
                 self.monitor_error = True
             else:
-                if self.connecting:
-                    self.output_id = None
-                    self.output_added = self.devices.add_output(self.output_device_id,
-                                                                self.output_id)
-                    if self.output_added is False:
-                        print("Output not added")
-                elif self.monitoring:
-                    self.output_id = None
-                    if (self.output_device_id, self.output_id) in self.monitored_outputs:
-                        self.error("OUTPUT_MONITORED", [(self.scanner.EOF, False)])
-                        self.section_skipped = True
-                        self.monitor_error = True
-                    else:
-                        self.monitored_outputs.append((self.output_device_id, self.output_id))
+                self.output_id = self.get_id(self.symbol)
+                self.output_added = self.devices.add_input(self.input_device_id,
+                                                           self.output_id)
 
     # @pytest.fixture
     # def test_name(self):
@@ -636,22 +582,36 @@ class Parser:
         if self.symbol.type == self.scanner.KEYWORD:
             if self.symbol.id == self.scanner.SWITCH_ID:
                 self.switch()
+                if self.device_error is False:
+                    self.devices.add_device(self.device_id, "SWITCH")
             elif self.symbol.id == self.scanner.CLOCK_ID:
                 self.clock()
+                if self.device_error is False:
+                    self.devices.add_device(self.device_id, "CLOCK")
             elif self.symbol.id == self.scanner.AND_ID:
                 self.and_gate()
+                if self.device_error is False:
+                    self.devices.add_device(self.device_id, "AND")
             elif self.symbol.id == self.scanner.NAND_ID:
                 self.nand_gate()
+                if self.device_error is False:
+                    self.devices.add_device(self.device_id, "NAND")
             elif self.symbol.id == self.scanner.OR_ID:
                 self.or_gate()
+                if self.device_error is False:
+                    self.devices.add_device(self.device_id, "OR")
             elif self.symbol.id == self.scanner.NOR_ID:
                 self.nor_gate()
+                if self.device_error is False:
+                    self.devices.add_device(self.device_id, "NOR")
             elif self.symbol.id == self.scanner.DTYPE_ID:
                 self.dtype()
+                if self.device_error is False:
+                    self.devices.add_device(self.device_id, "DTYPE")
             elif self.symbol.id == self.scanner.XOR_ID:
                 self.xor()
-            elif self.symbol.id == self.scanner.NOT_ID:
-                self.not_gate()
+                if self.device_error is False:
+                    self.devices.add_device(self.device_id, "XOR")
             else:
                 self.error("NO_GATE_TYPE", [(self.scanner.COMMA, False),
                                             (self.scanner.CONNECTIONS_ID, False),
@@ -659,9 +619,6 @@ class Parser:
                 if self.symbol.id == self.scanner.COMMA:
                     self.symbol = self.scanner.get_symbol()
                     self.gate_error = True
-                elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                        self.symbol.id == self.scanner.MONITOR_ID:
-                    self.section_skipped = True
                 self.device_error = True
         else:
             self.error("NO_GATE", [(self.scanner.COMMA, False),
@@ -670,12 +627,9 @@ class Parser:
             if self.symbol.id == self.scanner.COMMA:
                 self.symbol = self.scanner.get_symbol()
                 self.gate_error = True
-            elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                    self.symbol.id == self.scanner.MONITOR_ID:
-                self.section_skipped = True
             self.device_error = True
 
-    def switch(self):
+    def switch(self):  # FIX ERRORS
         """switch = "SWITCH with state", inital_switch;"""
         if self.symbol.type == self.scanner.KEYWORD \
                 and self.symbol.id == self.scanner.SWITCH_ID:
@@ -689,10 +643,8 @@ class Parser:
                     if self.symbol.type == self.scanner.INT16 \
                             and (self.symbol.id == self.scanner.ZERO
                                  or self.symbol.id == self.scanner.ONE):
-                        self.switch_input = int(self.names.get_name_string(self.symbol.id))
-                        if self.device_error is False:
-                            self.devices.make_switch(self.device_id, self.switch_input)
                         self.symbol = self.scanner.get_symbol()
+
                     else:
                         self.error("SWITCH_INPUT", [(self.scanner.COMMA, False),
                                                     (self.scanner.CONNECTIONS_ID, False),
@@ -700,9 +652,6 @@ class Parser:
                         if self.symbol.id == self.scanner.COMMA:
                             self.symbol = self.scanner.get_symbol()
                             self.gate_error = True
-                        elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                                self.symbol.id == self.scanner.MONITOR_ID:
-                            self.section_skipped = True
                         self.device_error = True
                 else:
                     self.error("NO_SWITCH", [(self.scanner.COMMA, False),
@@ -711,9 +660,6 @@ class Parser:
                     if self.symbol.id == self.scanner.COMMA:
                         self.symbol = self.scanner.get_symbol()
                         self.gate_error = True
-                    elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                            self.symbol.id == self.scanner.MONITOR_ID:
-                        self.section_skipped = True
                     self.device_error = True
             else:
                 self.error("NO_SWITCH", [(self.scanner.COMMA, False),
@@ -722,9 +668,6 @@ class Parser:
                 if self.symbol.id == self.scanner.COMMA:
                     self.symbol = self.scanner.get_symbol()
                     self.gate_error = True
-                elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                        self.symbol.id == self.scanner.MONITOR_ID:
-                    self.section_skipped = True
                 self.device_error = True
         else:
             self.error("NO_SWITCH", [(self.scanner.COMMA, False),
@@ -733,12 +676,9 @@ class Parser:
             if self.symbol.id == self.scanner.COMMA:
                 self.symbol = self.scanner.get_symbol()
                 self.gate_error = True
-            elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                    self.symbol.id == self.scanner.MONITOR_ID:
-                self.section_skipped = True
             self.device_error = True
 
-    def clock(self):  # FIX ERROR HANDLING FOR IF CONNECTIONS OR MONITOR ARE RETURNED
+    def clock(self):
         """clock = "CLOCK with", digit, "cycle period";"""
         if self.symbol.type == self.scanner.KEYWORD \
                 and self.symbol.id == self.scanner.CLOCK_ID:
@@ -748,77 +688,52 @@ class Parser:
                 self.symbol = self.scanner.get_symbol()
                 if self.symbol.type == self.scanner.INTEGER \
                         or self.symbol.type == self.scanner.INT16:
-                    self.clock_cycle = int(self.names.get_name_string(self.symbol.id))
                     self.symbol = self.scanner.get_symbol()
-                    while self.symbol.type == self.scanner.INT16:
-                        self.symbol = self.scanner.get_symbol()
                     if self.symbol.type == self.scanner.KEYWORD \
                             and self.symbol.id == self.scanner.CYCLE:
                         self.symbol = self.scanner.get_symbol()
                         if self.symbol.type == self.scanner.KEYWORD \
                                 and self.symbol.id == self.scanner.PERIOD:
-                            if self.device_error is False:
-                                self.devices.make_clock(self.device_id, self.clock_cycle)
                             self.symbol = self.scanner.get_symbol()
                         else:
                             self.error("NO_CYCLE", [(self.scanner.COMMA, False),
-                                                    (self.scanner.SEMICOLON, False),
                                                     (self.scanner.CONNECTIONS_ID, False),
                                                     (self.scanner.MONITOR_ID, False)])
                             if self.symbol.id == self.scanner.COMMA:
                                 self.symbol = self.scanner.get_symbol()
                                 self.gate_error = True
-                            elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                                    self.symbol.id == self.scanner.MONITOR_ID:
-                                self.section_skipped = True
                             self.device_error = True
                     else:
                         self.error("NO_CYCLE", [(self.scanner.COMMA, False),
-                                                (self.scanner.SEMICOLON, False),
                                                 (self.scanner.CONNECTIONS_ID, False),
                                                 (self.scanner.MONITOR_ID, False)])
                         if self.symbol.id == self.scanner.COMMA:
                             self.symbol = self.scanner.get_symbol()
                             self.gate_error = True
-                        elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                                self.symbol.id == self.scanner.MONITOR_ID:
-                            self.section_skipped = True
                         self.device_error = True
                 else:
                     self.error("NO_INTEGER", [(self.scanner.COMMA, False),
-                                              (self.scanner.SEMICOLON, False),
                                               (self.scanner.CONNECTIONS_ID, False),
                                               (self.scanner.MONITOR_ID, False)])
                     if self.symbol.id == self.scanner.COMMA:
                         self.symbol = self.scanner.get_symbol()
                         self.gate_error = True
-                    elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                            self.symbol.id == self.scanner.MONITOR_ID:
-                        self.section_skipped = True
                     self.device_error = True
             else:
                 self.error("NO_CLOCK", [(self.scanner.COMMA, False),
-                                        (self.scanner.SEMICOLON, False),
                                         (self.scanner.CONNECTIONS_ID, False),
                                         (self.scanner.MONITOR_ID, False)])
                 if self.symbol.id == self.scanner.COMMA:
                     self.symbol = self.scanner.get_symbol()
                     self.gate_error = True
-                elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                        self.symbol.id == self.scanner.MONITOR_ID:
-                    self.section_skipped = True
                 self.device_error = True
         else:
             self.error("NO_CLOCK", [(self.scanner.COMMA, False),
-                                    (self.scanner.SEMICOLON, False),
                                     (self.scanner.CONNECTIONS_ID, False),
                                     (self.scanner.MONITOR_ID, False)])
             if self.symbol.id == self.scanner.COMMA:
                 self.symbol = self.scanner.get_symbol()
                 self.gate_error = True
-            elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                    self.symbol.id == self.scanner.MONITOR_ID:
-                self.section_skipped = True
             self.device_error = True
 
     def and_gate(self):
@@ -831,13 +746,10 @@ class Parser:
                 self.symbol = self.scanner.get_symbol()
                 if self.symbol.type == self.scanner.INT16 \
                         or self.symbol.type == self.scanner.ONE:
-                    self.no_inputs = int(self.names.get_name_string(self.symbol.id))
                     self.symbol = self.scanner.get_symbol()
                     if self.symbol.type == self.scanner.KEYWORD \
                             and (self.symbol.id == self.scanner.INPUT or
                                  self.symbol.id == self.scanner.INPUTS):
-                        if self.device_error is False:
-                            self.devices.make_gate(self.device_id, self.devices.AND, self.no_inputs)
                         self.symbol = self.scanner.get_symbol()
                     else:
                         self.error("NO_INPUT", [(self.scanner.COMMA, False),
@@ -846,9 +758,6 @@ class Parser:
                         if self.symbol.id == self.scanner.COMMA:
                             self.symbol = self.scanner.get_symbol()
                             self.gate_error = True
-                        elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                                self.symbol.id == self.scanner.MONITOR_ID:
-                            self.section_skipped = True
                         self.device_error = True
                 else:
                     self.error("NO_INPUT_NO", [(self.scanner.COMMA, False),
@@ -857,9 +766,6 @@ class Parser:
                     if self.symbol.id == self.scanner.COMMA:
                         self.symbol = self.scanner.get_symbol()
                         self.gate_error = True
-                    elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                            self.symbol.id == self.scanner.MONITOR_ID:
-                        self.section_skipped = True
                     self.device_error = True
             else:
                 self.error("NO_AND", [(self.scanner.COMMA, False),
@@ -868,9 +774,6 @@ class Parser:
                 if self.symbol.id == self.scanner.COMMA:
                     self.symbol = self.scanner.get_symbol()
                     self.gate_error = True
-                elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                        self.symbol.id == self.scanner.MONITOR_ID:
-                    self.section_skipped = True
                 self.device_error = True
         else:
             self.error("NO_AND", [(self.scanner.COMMA, False),
@@ -879,9 +782,6 @@ class Parser:
             if self.symbol.id == self.scanner.COMMA:
                 self.symbol = self.scanner.get_symbol()
                 self.gate_error = True
-            elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                    self.symbol.id == self.scanner.MONITOR_ID:
-                self.section_skipped = True
             self.device_error = True
 
     def nand_gate(self):
@@ -894,13 +794,10 @@ class Parser:
                 self.symbol = self.scanner.get_symbol()
                 if self.symbol.type == self.scanner.INT16 \
                         or self.symbol.type == self.scanner.ONE:
-                    self.no_inputs = int(self.names.get_name_string(self.symbol.id))
                     self.symbol = self.scanner.get_symbol()
                     if self.symbol.type == self.scanner.KEYWORD \
                             and (self.symbol.id == self.scanner.INPUT or
                                  self.symbol.id == self.scanner.INPUTS):
-                        if self.device_error is False:
-                            self.devices.make_gate(self.device_id, self.devices.NAND, self.no_inputs)
                         self.symbol = self.scanner.get_symbol()
                     else:
                         self.error("NO_INPUT", [(self.scanner.COMMA, False),
@@ -909,9 +806,6 @@ class Parser:
                         if self.symbol.id == self.scanner.COMMA:
                             self.symbol = self.scanner.get_symbol()
                             self.gate_error = True
-                        elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                                self.symbol.id == self.scanner.MONITOR_ID:
-                            self.section_skipped = True
                         self.device_error = True
                 else:
                     self.error("NO_INPUT_NO", [(self.scanner.COMMA, False),
@@ -920,9 +814,6 @@ class Parser:
                     if self.symbol.id == self.scanner.COMMA:
                         self.symbol = self.scanner.get_symbol()
                         self.gate_error = True
-                    elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                            self.symbol.id == self.scanner.MONITOR_ID:
-                        self.section_skipped = True
                     self.device_error = True
             else:
                 self.error("NO_NAND", [(self.scanner.COMMA, False),
@@ -931,9 +822,6 @@ class Parser:
                 if self.symbol.id == self.scanner.COMMA:
                     self.symbol = self.scanner.get_symbol()
                     self.gate_error = True
-                elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                        self.symbol.id == self.scanner.MONITOR_ID:
-                    self.section_skipped = True
                 self.device_error = True
         else:
             self.error("NO_NAND", [(self.scanner.COMMA, False),
@@ -942,9 +830,6 @@ class Parser:
             if self.symbol.id == self.scanner.COMMA:
                 self.symbol = self.scanner.get_symbol()
                 self.gate_error = True
-            elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                    self.symbol.id == self.scanner.MONITOR_ID:
-                self.section_skipped = True
             self.device_error = True
 
     def or_gate(self):
@@ -957,13 +842,10 @@ class Parser:
                 self.symbol = self.scanner.get_symbol()
                 if self.symbol.type == self.scanner.INT16 \
                         or self.symbol.type == self.scanner.ONE:
-                    self.no_inputs = int(self.names.get_name_string(self.symbol.id))
                     self.symbol = self.scanner.get_symbol()
                     if self.symbol.type == self.scanner.KEYWORD \
                             and (self.symbol.id == self.scanner.INPUT or
                                  self.symbol.id == self.scanner.INPUTS):
-                        if self.device_error is False:
-                            self.devices.make_gate(self.device_id, self.devices.OR, self.no_inputs)
                         self.symbol = self.scanner.get_symbol()
                     else:
                         self.error("NO_INPUT", [(self.scanner.COMMA, False),
@@ -972,9 +854,6 @@ class Parser:
                         if self.symbol.id == self.scanner.COMMA:
                             self.symbol = self.scanner.get_symbol()
                             self.gate_error = True
-                        elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                                self.symbol.id == self.scanner.MONITOR_ID:
-                            self.section_skipped = True
                         self.device_error = True
                 else:
                     self.error("NO_INPUT_NO", [(self.scanner.COMMA, False),
@@ -983,9 +862,6 @@ class Parser:
                     if self.symbol.id == self.scanner.COMMA:
                         self.symbol = self.scanner.get_symbol()
                         self.gate_error = True
-                    elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                            self.symbol.id == self.scanner.MONITOR_ID:
-                        self.section_skipped = True
                     self.device_error = True
             else:
                 self.error("NO_OR", [(self.scanner.COMMA, False),
@@ -994,9 +870,6 @@ class Parser:
                 if self.symbol.id == self.scanner.COMMA:
                     self.symbol = self.scanner.get_symbol()
                     self.gate_error = True
-                elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                        self.symbol.id == self.scanner.MONITOR_ID:
-                    self.section_skipped = True
                 self.device_error = True
         else:
             self.error("NO_OR", [(self.scanner.COMMA, False),
@@ -1005,9 +878,6 @@ class Parser:
             if self.symbol.id == self.scanner.COMMA:
                 self.symbol = self.scanner.get_symbol()
                 self.gate_error = True
-            elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                    self.symbol.id == self.scanner.MONITOR_ID:
-                self.section_skipped = True
             self.device_error = True
 
     def nor_gate(self):
@@ -1021,15 +891,12 @@ class Parser:
                 if self.symbol.type == self.scanner.INT16 \
                         or self.symbol.type == \
                         self.scanner.ONE:
-                    self.no_inputs = int(self.names.get_name_string(self.symbol.id))
                     self.symbol = self.scanner.get_symbol()
                     if self.symbol.type == self.scanner.KEYWORD \
                             and (self.symbol.id ==
                                  self.scanner.INPUT or
                                  self.symbol.id ==
                                  self.scanner.INPUTS):
-                        if self.device_error is False:
-                            self.devices.make_gate(self.device_id, self.devices.NOR, self.no_inputs)
                         self.symbol = self.scanner.get_symbol()
                     else:
                         self.error("NO_INPUT", [(self.scanner.COMMA, False),
@@ -1038,9 +905,6 @@ class Parser:
                         if self.symbol.id == self.scanner.COMMA:
                             self.symbol = self.scanner.get_symbol()
                             self.gate_error = True
-                        elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                                self.symbol.id == self.scanner.MONITOR_ID:
-                            self.section_skipped = True
                         self.device_error = True
                 else:
                     self.error("NO_INPUT_NO", [(self.scanner.COMMA, False),
@@ -1049,9 +913,6 @@ class Parser:
                     if self.symbol.id == self.scanner.COMMA:
                         self.symbol = self.scanner.get_symbol()
                         self.gate_error = True
-                    elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                            self.symbol.id == self.scanner.MONITOR_ID:
-                        self.section_skipped = True
                     self.device_error = True
             else:
                 self.error("NO_NOR", [(self.scanner.COMMA, False),
@@ -1060,17 +921,12 @@ class Parser:
                 if self.symbol.id == self.scanner.COMMA:
                     self.symbol = self.scanner.get_symbol()
                     self.gate_error = True
-                elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                        self.symbol.id == self.scanner.MONITOR_ID:
-                    self.section_skipped = True
                 self.device_error = True
 
     def dtype(self):
         """dtype = "DTYPE";"""
         if self.symbol.type == self.scanner.KEYWORD \
                 and self.symbol.id == self.scanner.DTYPE_ID:
-            if self.device_error is False:
-                self.devices.make_d_type(self.device_id)
             self.symbol = self.scanner.get_symbol()
         else:
             self.error("NO_DTYPE", [(self.scanner.COMMA, False),
@@ -1079,17 +935,12 @@ class Parser:
             if self.symbol.id == self.scanner.COMMA:
                 self.symbol = self.scanner.get_symbol()
                 self.gate_error = True
-            elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                    self.symbol.id == self.scanner.MONITOR_ID:
-                self.section_skipped = True
             self.device_error = True
 
     def xor(self):
         """xor = "XOR";"""
         if self.symbol.type == self.scanner.KEYWORD \
-                and self.symbol.id == self.scanner.XOR_ID:
-            if self.device_error is False:
-                self.devices.make_gate(self.device_id, self.devices.XOR, 2)
+                and self.scanner.id == self.scanner.XOR_ID:
             self.symbol = self.scanner.get_symbol()
         else:
             self.error("NO_XOR", [(self.scanner.COMMA, False),
@@ -1098,42 +949,19 @@ class Parser:
             if self.symbol.id == self.scanner.COMMA:
                 self.symbol = self.scanner.get_symbol()
                 self.gate_error = True
-            elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                    self.symbol.id == self.scanner.MONITOR_ID:
-                self.section_skipped = True
             self.device_error = True
 
     # @pytest.fixture
     # def test_output(self):
     #     assert type(self.output_device_id) == int
 
-    def not_gate(self):
-        if self.symbol.type == self.scanner.KEYWORD \
-                and self.symbol.id == self.scanner.NOT_ID:
-            if self.device_error is False:
-                self.devices.make_gate(self.device_id, self.devices.NOT, 1)
-            self.symbol = self.scanner.get_symbol()
-        else:
-            self.error("NO_NOT", [(self.scanner.COMMA, False),
-                                  (self.scanner.CONNECTIONS_ID, False),
-                                  (self.scanner.MONITOR_ID, False)])
-            if self.symbol.id == self.scanner.COMMA:
-                self.symbol = self.scanner.get_symbol()
-                self.gate_error = True
-            elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                    self.symbol.id == self.scanner.MONITOR_ID:
-                self.section_skipped = True
-            self.device_error = True
-
     def boolean_input(self):
         """boolean_input = "I", number_inputs;"""
         characters = [c for c in self.scanner.string]
         if 1 <= int(characters[1]) <= 16:
-            self.input_id = self.get_input_id(self.input_device_id)
+            self.input_id = self.get_id(self.symbol)
             self.input_added = self.devices.add_input(self.input_device_id,
                                                       self.input_id)
-            if self.input_added is False:
-                print("Output not added")
             self.symbol = self.scanner.get_symbol()
         else:
             self.error("NO_INPUT_NO", [(self.scanner.COMMA, False),
@@ -1141,9 +969,6 @@ class Parser:
             if self.symbol.id == self.scanner.COMMA:
                 self.symbol = self.scanner.get_symbol()
                 self.input_error = True
-            elif self.symbol.id == self.scanner.CONNECTIONS_ID or \
-                    self.symbol.id == self.scanner.MONITOR_ID:
-                self.section_skipped = True
             self.connection_error = True
 
     # @pytest.fixture
@@ -1152,11 +977,9 @@ class Parser:
 
     def dtype_input(self):
         """dtype_input = ("DATA" | "CLK" | "SET" | "CLEAR");"""
-        self.input_id = self.get_input_id(self.input_device_id)
+        self.input_id = self.get_id(self.symbol)
         self.input_added = self.devices.add_input(self.input_device_id,
                                                   self.input_id)
-        if self.input_added is False:
-            print("Output not added")
         self.symbol = self.scanner.get_symbol()
 
     # @pytest.fixture
@@ -1165,14 +988,9 @@ class Parser:
 
     def dtype_output(self):
         """dtype_output = ("Q" | "QBAR");"""
-        if self.connecting:
-            self.output_id = self.get_output_id(self.output_device_id)
-            self.output_added = self.devices.add_output(self.output_device_id,
-                                                        self.output_id)
-        elif self.monitoring:
-            self.output_id = self.get_output_id(self.output_device_id)
-        if self.output_added is False:
-            print("Output not added")
+        self.output_id = self.get_id(self.symbol)
+        self.output_added = self.devices.add_input(self.input_device_id,
+                                                   self.output_id)
         self.symbol = self.scanner.get_symbol()
 
     # @pytest.fixture
@@ -1209,49 +1027,25 @@ class Parser:
 
     def get_id(self, device_name):
         symbol_id = device_name.id
+
         if self.defining:
             if symbol_id not in self.devices_symbol_list:
                 self.devices_symbol_list.append(symbol_id)
-                return symbol_id
+                device_id = self.devices_symbol_list.index(symbol_id)
+                return device_id
             else:
-                self.error("DEVICE_EXISTS", [(self.scanner.EOF, False)])
-                self.section_skipped = True
+                self.error("DEVICE_EXISTS", [(None, False)])
+                self.id_error = True
                 self.device_error = True
                 return None
-        elif self.connecting or self.monitoring:
+
+        elif self.connecting:
+            pdb.set_trace()
             if symbol_id in self.devices_symbol_list:
-                return symbol_id
+                device_id = self.devices_symbol_list.index(symbol_id)
+                return device_id
             else:
-                self.error("NO_DEVICE", [(self.scanner.EOF, False)])
-                self.section_skipped = True
+                self.error("NO_DEVICE", [(None, False)])
+                self.id_error = True
                 self.connection_error = True
                 return None
-
-    def device_dictionary(self):
-        for symbol_id in self.devices_symbol_list:
-            self.device_input_dict[symbol_id] = []
-            self.device_output_dict[symbol_id] = []
-
-    def get_input_id(self, device_name_id):
-        input_numbers = self.device_input_dict[device_name_id]
-        if self.symbol.id not in input_numbers:
-            self.device_input_dict[device_name_id].append(self.symbol.id)
-            return self.symbol.id
-        else:
-            self.error("INPUT_USED", [(self.scanner.EOF, False)])
-            self.section_skipped = True
-            self.connection_error = True
-
-    def get_output_id(self, device_name_id):
-        output_numbers = self.device_output_dict[device_name_id]
-        if self.symbol.id not in output_numbers:
-            self.device_output_dict[device_name_id].append(self.symbol.id)
-            return self.symbol.id
-        else:
-            if self.monitoring:
-                if (device_name_id, self.symbol.id) in self.monitored_outputs:
-                    self.error("OUTPUT_MONITORED", [(self.scanner.EOF, False)])
-                    self.section_skipped = True
-                    self.monitor_error = True
-                else:
-                    self.monitored_outputs.append((device_name_id, self.symbol.id))
