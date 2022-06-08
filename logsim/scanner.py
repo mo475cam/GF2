@@ -141,12 +141,6 @@ class Scanner:
             self.advance()
             # print(",")
 
-        # check for new line
-        elif self.current_character == '\n':
-            symbol.type = self.PUNCTUATION
-            symbol.id = self.names.query(self.current_character)
-            self.advance()
-
         # check for comments
         elif self.current_character == "#":
             symbol.type = self.PUNCTUATION

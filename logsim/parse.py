@@ -288,7 +288,7 @@ class Parser:
             self.symbol = self.scanner.get_symbol()
             if self.symbol.id in stopping_symbols:
                 symbol_index = stopping_symbols.index(self.symbol.id)
-                print("Returned to parsing", self.names.get_name_string(self.symbol.id))
+                #print("Returned to parsing", self.names.get_name_string(self.symbol.id))
                 if go_to_next[symbol_index]:
                     self.symbol = self.scanner.get_symbol()
                 self.in_stopping_symbol = True
@@ -350,8 +350,7 @@ class Parser:
                         if (self.symbol.type == self.scanner.KEYWORD
                             and self.symbol.id == self.scanner.MONITOR_ID) \
                                 or self.symbol.type == self.scanner.EOF:
-                            self.error("NO_SEMICOLON", [(self.scanner.CONNECTIONS_ID, False),
-                                                        (self.scanner.MONITOR_ID, False)])
+                            self.error("NO_SEMICOLON", [(self.scanner.MONITOR_ID, False)])
                             break
                         else:
                             self.connection()
@@ -1235,14 +1234,6 @@ class Parser:
     # @pytest.fixture
     # def test_dtype_output(self):
     #     assert type(self.output_id) == int and self.output_added is True
-
-    def initial_input(self):
-        """initial_switch = "0"|"1";"""
-        if self.symbol.id == self.scanner.ZERO \
-                or self.symbol.id == self.scanner.ONE:
-            return True
-        else:
-            return False
 
     def get_id(self, device_name):
         symbol_id = device_name.id
