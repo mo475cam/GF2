@@ -57,13 +57,14 @@ class Parser:
         self.clock_cycle = 0
         self.no_inputs = 0
 
+        self.dtype_monitor = False
+        self.Q_output = False
+        self.Qbar_output = False
+
         self.devices_symbol_list = []
         self.device_input_dict = {}
         self.device_output_dict = {}
         self.monitored_outputs = []
-
-        self.input_added = False
-        self.output_added = False
 
         self.error_count = 0
         self.syntax_error_count = 0
@@ -376,7 +377,14 @@ class Parser:
         self.output()
         # make monitor only if no errors have been found
         if self.error_count == 0:
-            error_type = self.monitors.make_monitor(self.output_device_id, self.output_id)
+            if self.dtype_monitor:
+                if self.Q_output:
+                    self.output_id = self.devices.dtype_output_ids[0]
+                elif self.Qbar_output:
+                    self.output_id = self.devices.dtype_output_ids[1]
+                error_type = self.monitors.make_monitor(self.output_device_id, self.output_id)
+            else:
+                error_type = self.monitors.make_monitor(self.output_device_id, self.output_id)
             if error_type != self.monitors.NO_ERROR:
                 self.error("MONITOR_FAILED", [(self.scanner.EOF, False)])
                 self.section_skipped = True
@@ -665,6 +673,8 @@ class Parser:
                 if self.symbol.id == self.scanner.Q \
                         or self.symbol.id == \
                         self.scanner.QBAR:
+                    if self.monitoring:
+                        self.dtype_monitor = True
                     self.dtype_output()
                 else:
                     self.error("NO_OUTPUT_TYPE", [(self.scanner.COMMA, False),
@@ -722,12 +732,6 @@ class Parser:
                 if self.connecting:
                     # non d-type output id set to None
                     self.output_id = None
-                    if self.error_count == 0:
-                        # output added to device if no errors
-                        self.output_added = self.devices.add_output(self.output_device_id,
-                                                                    self.output_id)
-                        if self.output_added is False:
-                            print("Output not added")
                 elif self.monitoring:
                     # non d-type output id set to None
                     self.output_id = None
@@ -1353,12 +1357,8 @@ class Parser:
         # check that number of inputs is between 1 and 16
         if 1 <= int(characters[1]) <= 16:
             if self.error_count == 0:
-                # get input port id and add input if no errors found
+                # get input port id
                 self.input_id = self.get_input_id(self.input_device_id)
-                self.input_added = self.devices.add_input(self.input_device_id,
-                                                          self.input_id)
-                if self.input_added is False:
-                    print("Input not added")
             self.symbol = self.scanner.get_symbol()
         else:
             self.error("NO_INPUT_NO", [(self.scanner.COMMA, False),
@@ -1378,25 +1378,21 @@ class Parser:
         """dtype_input = ("DATA" | "CLK" | "SET" | "CLEAR");"""
         # check syntax of d-type input
         if self.error_count == 0:
-            # get input port id and add input if no errors found
+            # get input port id
             self.input_id = self.get_input_id(self.input_device_id)
-            self.input_added = self.devices.add_input(self.input_device_id,
-                                                      self.input_id)
-            if self.input_added is False:
-                print("Output not added")
         self.symbol = self.scanner.get_symbol()
 
     def dtype_output(self):
         """dtype_output = ("Q" | "QBAR");"""
-        # check syntax of d-type output
+        # check syntax d-type output
+        if self.symbol.id == self.scanner.Q:
+            self.Q_output = True
+        elif self.symbol.id == self.scanner.QBAR:
+            self.Qbar_output = True
         if self.connecting:
             if self.error_count == 0:
                 # get output port id and add output if no errors found
                 self.output_id = self.get_output_id(self.output_device_id)
-                self.output_added = self.devices.add_output(self.output_device_id,
-                                                            self.output_id)
-                if self.output_added is False:
-                    print("Output not added")
         elif self.monitoring:
             # get output port id of output to be monitored
             self.output_id = self.get_output_id(self.output_device_id)

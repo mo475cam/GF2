@@ -23,4 +23,4 @@ G4 to G3.I2;
 
 #define monitors#
 
-MONITOR G3 and G4;
+MONITOR G1 and C1;
